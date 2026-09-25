@@ -1,0 +1,108 @@
+---
+title: "index"
+format: html
+editor: visual
+---
+
+#TODO: Should I keep this as Qmd or a base R file is enough -- I will have more clarity as I move forward making changes 
+
+# Overall Goal
+
+
+Our goal is to write functions that will manipulate and process data sets that come from a census API. We’ll
+create generic functions to automatically summarize and plot certain returned data
+
+# Data
+
+We are going to query the Public Use Microdata Sample (PUMS) Census API. This API gives pseudo
+person-level data
+
+## PUMS API URLs
+
+We aren’t going to worry about Puerto Rico data so focusing on the basic PUMS information
+
+- [2021](api.census.gov/data/2021/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
+- [2022](api.census.gov/data/2022/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
+- [2023](api.census.gov/data/2023/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
+- [2024](api.census.gov/data/2024/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
+
+## List of PUMS variables 
+
+- [2021 list of variables](https://api.census.gov/data/2021/acs/acs1/pums/variables.html)
+- [2022 list of variables](https://api.census.gov/data/2022/acs/acs1/pums/variables.html)
+- [2023 list of variables](https://api.census.gov/data/2023/acs/acs1/pums/variables.html)
+- [2024 list of variables](https://api.census.gov/data/2024/acs/acs1/pums/variables.html)
+
+## Users choice
+
+Allow user to choose certian variables and conditions 
+TODO: come back to this and fill what is allowed 
+
+# Part 1: Data Processing 
+
+## Parsing Variable Values
+
+We’re going to start by downloading and parsing the JSON files with the variable descriptions for each year for the following years
+- 2021
+- 2022
+- 2023
+- 2024
+
+```{r}
+library(httr)
+library(tidyverse)
+library(dotenv)
+
+# load in env file for API key
+load_dot_env()
+
+api_key <- Sys.getenv("CENSUS_API_KEY")
+
+variables_base_list <- list( "AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP", "FER", "HHL", "SCH", "SCHL", "SEX")
+variables_2021_2022 <- append(variables_base_list,list("ST","STATE"))
+variables_2023_2024 <- append(variables_base_list,list("REGION","DIVISION"))
+
+
+variables_by_year <- list(
+  "2021" = variables_2021_2022,
+  "2022" = variables_2021_2022,
+  "2023" = variables_2023_2024,
+  "2024" = variables_2023_2024
+)
+
+get_variables_by_year <- function(year_str){
+  
+  url <- paste0(
+    "https://api.census.gov/data/",
+    year_str,
+    "/acs/acs1/pumspr/variables.json"
+  )
+  api_variables <- GET(url)
+  
+  variables_response <- content(
+    api_variables,
+    as = 'parsed',
+    simplifyVector = FALSE
+  )
+ # variables_response$variables
+ # names(variables_response$variables)
+ # variables_by_year[year_str]
+ filtered_variables <-   variables_response$variables[names(variables_response$variables) %in% variables_by_year[year_str]]
+  
+}
+
+#get_variables_by_year(2021)
+
+for (year in names(variables_by_year)) {
+  
+  file_name <- paste0("data/variables_", year, ".rds")
+  
+  saveRDS(
+    variables_by_year[[year]],
+    file_name
+  )
+}
+
+
+```
+
