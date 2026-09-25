@@ -1,0 +1,37 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "index",
+    "section": "",
+    "text": "#TODO: Should I keep this as Qmd or a base R file is enough – I will have more clarity as I move forward making changes"
+  },
+  {
+    "objectID": "index.html#pums-api-urls",
+    "href": "index.html#pums-api-urls",
+    "title": "index",
+    "section": "PUMS API URLs",
+    "text": "PUMS API URLs\nWe aren’t going to worry about Puerto Rico data so focusing on the basic PUMS information\n\n2021\n2022\n2023\n2024"
+  },
+  {
+    "objectID": "index.html#list-of-pums-variables",
+    "href": "index.html#list-of-pums-variables",
+    "title": "index",
+    "section": "List of PUMS variables",
+    "text": "List of PUMS variables\n\n2021 list of variables\n2022 list of variables\n2023 list of variables\n2024 list of variables"
+  },
+  {
+    "objectID": "index.html#users-choice",
+    "href": "index.html#users-choice",
+    "title": "index",
+    "section": "Users choice",
+    "text": "Users choice\nAllow user to choose certian variables and conditions TODO: come back to this and fill what is allowed"
+  },
+  {
+    "objectID": "index.html#parsing-variable-values",
+    "href": "index.html#parsing-variable-values",
+    "title": "index",
+    "section": "Parsing Variable Values",
+    "text": "Parsing Variable Values\nWe’re going to start by downloading and parsing the JSON files with the variable descriptions for each year for the following years - 2021 - 2022 - 2023 - 2024\n\nlibrary(httr)\nlibrary(tidyverse)\n\n── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──\n✔ dplyr     1.2.1     ✔ readr     2.2.0\n✔ forcats   1.0.1     ✔ stringr   1.6.0\n✔ ggplot2   4.0.3     ✔ tibble    3.3.1\n✔ lubridate 1.9.5     ✔ tidyr     1.3.2\n✔ purrr     1.2.2     \n── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──\n✖ dplyr::filter() masks stats::filter()\n✖ dplyr::lag()    masks stats::lag()\nℹ Use the conflicted package (&lt;http://conflicted.r-lib.org/&gt;) to force all conflicts to become errors\n\nlibrary(dotenv)\n\nWarning in readLines(file): incomplete final line found on '.env'\n\n# load in env file for API key\nload_dot_env()\n\nWarning in readLines(file): incomplete final line found on '.env'\n\napi_key &lt;- Sys.getenv(\"CENSUS_API_KEY\")\n\nvariables_base_list &lt;- list( \"AGEP\", \"GASP\", \"GRPIP\", \"JWAP\", \"JWDP\", \"JWMNP\", \"PWGTP\", \"FER\", \"HHL\", \"SCH\", \"SCHL\", \"SEX\")\nvariables_2021_2022 &lt;- append(variables_base_list,list(\"ST\",\"STATE\"))\nvariables_2023_2024 &lt;- append(variables_base_list,list(\"REGION\",\"DIVISION\"))\n\n\nvariables_by_year &lt;- list(\n  \"2021\" = variables_2021_2022,\n  \"2022\" = variables_2021_2022,\n  \"2023\" = variables_2023_2024,\n  \"2024\" = variables_2023_2024\n)\n\nget_variables_by_year &lt;- function(year_str){\n  \n  url &lt;- paste0(\n    \"https://api.census.gov/data/\",\n    year_str,\n    \"/acs/acs1/pumspr/variables.json\"\n  )\n  api_variables &lt;- GET(url)\n  \n  variables_response &lt;- content(\n    api_variables,\n    as = 'parsed',\n    simplifyVector = FALSE\n  )\n # variables_response$variables\n # names(variables_response$variables)\n # variables_by_year[year_str]\n filtered_variables &lt;-   variables_response$variables[names(variables_response$variables) %in% variables_by_year[year_str]]\n  \n}\n\n#get_variables_by_year(2021)\n\nfor (year in names(variables_by_year)) {\n  \n  file_name &lt;- paste0(\"data/variables_\", year, \".rds\")\n  \n  saveRDS(\n    variables_by_year[[year]],\n    file_name\n  )\n}"
+  }
+]
