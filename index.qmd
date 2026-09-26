@@ -69,6 +69,11 @@ variables_by_year <- list(
 
 get_variables_by_year <- function(year_str){
   
+  if(!is.character(year_str)) {
+    warning("Year should be passed as character string like \"2024\". coercing to character string to make code work")
+    year_str <- as.character(year_str)
+  }
+  
   url <- paste0(
     "https://api.census.gov/data/",
     year_str,
@@ -76,32 +81,77 @@ get_variables_by_year <- function(year_str){
   )
   api_variables <- GET(url)
   
-  variables_response <- content(
-    api_variables,
-    as = 'parsed',
-    simplifyVector = FALSE
-  )
+  print(status_code(api_variables))
+  
+  print(names(api_variables))          # does this include "variables" at all?
+  print(length(api_variables$variables))
+  
+   variables_response <- fromJSON(rawToChar(api_variables$content), simplifyVector = TRUE)
+
  # variables_response$variables
  # names(variables_response$variables)
  # variables_by_year[year_str]
- filtered_variables <-   variables_response$variables[names(variables_response$variables) %in% variables_by_year[year_str]]
+ filtered_variables <-   variables_response$variables[names(variables_response$variables) %in% variables_by_year[[year_str]]]
   
 }
 
-#get_variables_by_year(2021)
+# for (year in names(variables_by_year)) {
+#   var_yr_variables_temp <- get_variables_by_year(year)
+# 
+#   cat("Year:", year,
+#       "- length(names):", length(names(var_yr_variables_temp)),
+#       "- length(sapply):", length(sapply(var_yr_variables_temp, function(v) v$predicateType)),
+#       "\n")
+# }
+
+# var_yr_variables_temp <- get_variables_by_year("2024")
+# variable_table_2024 <- data.frame(
+#   variable = names(var_yr_variables_temp),
+#   predicateType = sapply(var_yr_variables_temp, function(v) v$predicateType)
+# )
+# 
+# print(variable_table_2024)
+# 
+# var_yr_variables_temp <- get_variables_by_year("2023")
+# variable_table_2023 <- data.frame(
+#   variable = names(var_yr_variables_temp),
+#   predicateType = sapply(var_yr_variables_temp, function(v) v$predicateType)
+# )
+# 
+# print(variable_table_2023)
+
+
+
+var_yr_variables_temp <- get_variables_by_year("2022")
+
+print(status_code(GET(paste0("https://api.census.gov/data/2022/acs/acs1/pumspr/variables.json"))))
+cat("length(names):", length(names(var_yr_variables_temp)),
+    "- length(sapply):", length(sapply(var_yr_variables_temp, function(v) v$predicateType)), "\n")
+
+# var_yr_variables_temp <- get_variables_by_year("2021")
+# variable_table_2021 <- data.frame(
+#   variable = names(var_yr_variables_temp),
+#   predicateType = sapply(var_yr_variables_temp, function(v) v$predicateType)
+# )
+# 
+# print(variable_table_2021)
+
 
 for (year in names(variables_by_year)) {
   
   file_name <- paste0("data/variables_", year, ".rds")
   
   saveRDS(
-    variables_by_year[[year]],
+    get_variables_by_year(year),
     file_name
   )
 }
 
 
 ```
+
+
+
 
 ## Parsing API Data
 
@@ -123,22 +173,31 @@ load_dot_env()
 
 api_key <- Sys.getenv("CENSUS_API_KEY")
 
+load_variables_rds_by_year <- function(year_str  = c("2024", "2023", "2022", "2021")) {
+  year_str <- match.arg(year_str, several.ok = FALSE)
+  file_name <- paste0("data/variables_", year_str, ".rds")
+  readRDS(file_name)
+}
 
 
-get_pums_data_as_tibble__by_year <- function(api_key, year_str, numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP","JWMNP", "PWGTP")) {
+
+get_pums_data_as_tibble__by_year <- function(api_key, year_str = c("2024", "2023", "2022", "2021"), numeric_vars = c("AGEP","GASP","GRPIP","JWAP","JWDP","JWMNP")) {
   
    #check for missing inputs 
   if (missing(api_key)) {
     stop("apiKey are required")
   }
   
+   year_str <- match.arg(year_str, several.ok = FALSE)
   
   if (missing(year_str)) {
     message("year_str is not supplied, 2024 is supplied as default")
-    year_str <- "2024"
   }
-  
-  numeric_vars <- match.arg(numeric_vars, several.ok = TRUE)
+  variables_supported = load_variables_rds_by_year(year_str)
+   numeric_vars = intersect(
+   numeric_vars,
+    names(load_variables_rds_by_year(year_str))
+  )
   
   url <- paste0(
     "https://api.census.gov/data/",
@@ -151,24 +210,19 @@ get_pums_data_as_tibble__by_year <- function(api_key, year_str, numeric_vars = c
   
 
   
-  print(url) 
-  
   pums_data <- GET(url)
   
   resp_json <- fromJSON(rawToChar(pums_data$content))
 
- # variables_response$variables
- # names(variables_response$variables)
- # variables_by_year[year_str]
- 
-  # class(your_tibble) <- c("census", class(your_tibble)
+  resp_tibble <- as_tibble(resp_json)
   
 }
 
 
-pums_tibble_2024 <- get_pums_data_as_tibble__by_year(api_key, 2024, numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP","JWMNP","PWGTP"))
+pums_tibble_2024 <- get_pums_data_as_tibble__by_year(api_key, c("2024"), numeric_vars = c("AGEP", "PWGTP"))
 
-pums_tibble_2024
+print(pums_tibble_2024)
+
 
 
 ```
