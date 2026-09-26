@@ -21,10 +21,10 @@ person-level data
 
 We aren’t going to worry about Puerto Rico data so focusing on the basic PUMS information
 
-- [2021](api.census.gov/data/2021/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
-- [2022](api.census.gov/data/2022/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
-- [2023](api.census.gov/data/2023/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
-- [2024](api.census.gov/data/2024/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
+- [2021](https://api.census.gov/data/2021/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
+- [2022](https://api.census.gov/data/2022/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
+- [2023](https://api.census.gov/data/2023/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
+- [2024](https://api.census.gov/data/2024/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
 
 ## List of PUMS variables 
 
@@ -54,9 +54,6 @@ library(tidyverse)
 library(dotenv)
 
 # load in env file for API key
-load_dot_env()
-
-api_key <- Sys.getenv("CENSUS_API_KEY")
 
 variables_base_list <- list( "AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP", "FER", "HHL", "SCH", "SCHL", "SEX")
 variables_2021_2022 <- append(variables_base_list,list("ST","STATE"))
@@ -105,4 +102,75 @@ for (year in names(variables_by_year)) {
 
 
 ```
+
+## Parsing API Data
+
+Write a function to query the PUMS API and return a nicely formatted tibble
+
+- 2021
+- 2022
+- 2023
+- 2024
+
+```{r}
+
+library(jsonlite)
+library(tidyverse)
+library(dotenv)
+
+# load in env file for API key
+load_dot_env()
+
+api_key <- Sys.getenv("CENSUS_API_KEY")
+
+
+
+get_pums_data_as_tibble__by_year <- function(api_key, year_str, numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP","JWMNP", "PWGTP")) {
+  
+   #check for missing inputs 
+  if (missing(api_key)) {
+    stop("apiKey are required")
+  }
+  
+  
+  if (missing(year_str)) {
+    message("year_str is not supplied, 2024 is supplied as default")
+    year_str <- "2024"
+  }
+  
+  numeric_vars <- match.arg(numeric_vars, several.ok = TRUE)
+  
+  url <- paste0(
+    "https://api.census.gov/data/",
+    year_str,
+    "/acs/acs1/pums?get=",
+     paste(numeric_vars, collapse = ","),
+     "&SCHL=24&key=",
+    api_key
+  )
+  
+
+  
+  print(url) 
+  
+  pums_data <- GET(url)
+  
+  resp_json <- fromJSON(rawToChar(pums_data$content))
+
+ # variables_response$variables
+ # names(variables_response$variables)
+ # variables_by_year[year_str]
+ 
+  # class(your_tibble) <- c("census", class(your_tibble)
+  
+}
+
+
+pums_tibble_2024 <- get_pums_data_as_tibble__by_year(api_key, 2024, numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP","JWMNP","PWGTP"))
+
+pums_tibble_2024
+
+
+```
+
 
