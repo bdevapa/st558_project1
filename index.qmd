@@ -638,9 +638,44 @@ pums_tible_2024_2021_with_state <- get_pums_data_as_tibble_multiple_years(
   geography_value = c(37)
 )
 
-#pums_tible_2024_2021_with_state
+pums_tible_2024_2021_with_state
 print(unique(pums_tible_2024_2021_with_state$year))
 table(pums_tible_2024_2021_with_state$year)
 
 ```
 
+# Part 2: Writing a Generic Function for Summarizing
+
+```{r}
+summary.census <- function(x, numeric_vars = NULL, categorical_vars = NULL) {
+  
+  dflt_categorical_vars <- c("FER", "HHL", "SCH", "SCHL", "SEX")
+  dflt_numeric_vars <- c("AGEP", "GASP", "GRPIP",  "JWMNP")
+
+  if(is.null(numeric_vars)) {
+    numeric_vars = dflt_numeric_vars
+  } else {
+    for(nv in numeric_vars) {
+      matched_value <- match_allowed_value(nv,dflt_numeric_vars)
+      if(is.na(matched_value)) {
+        stop("numeric variables must only contain: ", paste(dflt_numeric_vars,collapse = ","))
+      }
+    }
+  }
+  
+  if(is.null(categorical_vars)) {
+    categorical_vars = dflt_categorical_vars
+  } else {
+    for(cv in categorical_vars) {
+      matched_value <- match_allowed_value(nv,dflt_categorical_vars)
+      if(is.na(matched_value)) {
+        stop("numeric variables must only contain: ", paste(dflt_categorical_vars,collapse = ","))
+      }
+    }
+  }
+  
+  summary_result <- list()
+
+}
+
+```
