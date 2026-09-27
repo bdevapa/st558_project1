@@ -2,20 +2,19 @@
 title: "index"
 format: html
 editor: visual
+  markdown: 
+    wrap: 72
 ---
 
-#TODO: Should I keep this as Qmd or a base R file is enough -- I will have more clarity as I move forward making changes 
+#TODO: Should I keep this as Qmd or a base R file is enough -- I will have more clarity as I move forward making changes
 
 # Overall Goal
 
-
-Our goal is to write functions that will manipulate and process data sets that come from a census API. We’ll
-create generic functions to automatically summarize and plot certain returned data
+Our goal is to write functions that will manipulate and process data sets that come from a census API. We’ll create generic functions to automatically summarize and plot certain returned data
 
 # Data
 
-We are going to query the Public Use Microdata Sample (PUMS) Census API. This API gives pseudo
-person-level data
+We are going to query the Public Use Microdata Sample (PUMS) Census API. This API gives pseudo person-level data
 
 ## PUMS API URLs
 
@@ -26,7 +25,7 @@ We aren’t going to worry about Puerto Rico data so focusing on the basic PUMS 
 - [2023](https://api.census.gov/data/2023/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
 - [2024](https://api.census.gov/data/2024/acs/acs1/pums?get=SEX,PWGTP,MAR&SCHL=24&key=YOUR_KEY_GOES_HERE)
 
-## List of PUMS variables 
+## List of PUMS variables
 
 - [2021 list of variables](https://api.census.gov/data/2021/acs/acs1/pums/variables.html)
 - [2022 list of variables](https://api.census.gov/data/2022/acs/acs1/pums/variables.html)
@@ -35,18 +34,13 @@ We aren’t going to worry about Puerto Rico data so focusing on the basic PUMS 
 
 ## Users choice
 
-Allow user to choose certian variables and conditions 
-TODO: come back to this and fill what is allowed 
+Allow user to choose certian variables and conditions TODO: come back to this and fill what is allowed
 
-# Part 1: Data Processing 
+# Part 1: Data Processing
 
 ## Parsing Variable Values
 
-We’re going to start by downloading and parsing the JSON files with the variable descriptions for each year for the following years
-- 2021
-- 2022
-- 2023
-- 2024
+We’re going to start by downloading and parsing the JSON files with the variable descriptions for each year for the following years - 2021 - 2022 - 2023 - 2024
 
 ```{r}
 library(httr)
@@ -148,10 +142,8 @@ for (year in names(variables_by_year)) {
 }
 
 
+
 ```
-
-
-
 
 ## Parsing API Data
 
@@ -179,52 +171,322 @@ load_variables_rds_by_year <- function(year_str  = c("2024", "2023", "2022", "20
   readRDS(file_name)
 }
 
+```
 
 
-get_pums_data_as_tibble__by_year <- function(api_key, year_str = c("2024", "2023", "2022", "2021"), numeric_vars = c("AGEP","GASP","GRPIP","JWAP","JWDP","JWMNP")) {
-  
-   #check for missing inputs 
+
+```{r}
+
+get_pums_data_as_tibble__by_year <- function(api_key,
+                                             year_str = c("2024", "2023", "2022", "2021"),
+                                             numeric_vars = c("AGEP", "PWGTP")) {
+  #check for missing inputs
   if (missing(api_key)) {
     stop("apiKey are required")
   }
   
-   year_str <- match.arg(year_str, several.ok = FALSE)
+  year_str <- match.arg(year_str, several.ok = FALSE)
   
   if (missing(year_str)) {
     message("year_str is not supplied, 2024 is supplied as default")
   }
   variables_supported = load_variables_rds_by_year(year_str)
-   numeric_vars = intersect(
-   numeric_vars,
-    names(load_variables_rds_by_year(year_str))
-  )
+  
+  allowed_numeric_vars <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
+  non_allowed_nuermic_var_in_input <- FALSE
+  is_pwgtp_part_of_input <- FALSE
+  number_of_numeric_values_outside_pwgtp <- 0
+  
+  # validate the input tags
+  for (v in numeric_vars) {
+    if (v == "PWGTP") {
+      is_pwgtp_part_of_input <- TRUE
+    }
+    v_allowed <- FALSE
+    for (allowed in allowed_numeric_vars) {
+      if (v == allowed) {
+        v_allowed <- TRUE
+      }
+    }
+    
+    if (!v_allowed) {
+      non_allowed_nuermic_var_in_input <- TRUE
+    }
+    else if (v != "PWGTP") {
+      number_of_numeric_values_outside_pwgtp <- number_of_numeric_values_outside_pwgtp + 1
+    }
+  }
+  
+  if (non_allowed_nuermic_var_in_input) {
+    stop("numeric_vars must only contain: ",
+         paste(allowed_numeric_vars, collapse = ", "))
+  }
+  
+  if (number_of_numeric_values_outside_pwgtp == 0) {
+    stop("at least one numeric var other than PWGTP must be specified in the input")
+  }
+  
+  if (!is_pwgtp_part_of_input) {
+    numeric_vars <- c(numeric_vars, "PWGTP")
+  }
   
   url <- paste0(
     "https://api.census.gov/data/",
     year_str,
     "/acs/acs1/pums?get=",
-     paste(numeric_vars, collapse = ","),
-     "&SCHL=24&key=",
+    paste(numeric_vars, collapse = ","),
+    "&SCHL=24&key=",
     api_key
   )
   
-
-  
   pums_data <- GET(url)
-  
   resp_json <- fromJSON(rawToChar(pums_data$content))
-
-  resp_tibble <- as_tibble(resp_json)
+  #resp_tibble <- as_tibble(resp_json)
   
+  pums_tibble <- as_tibble(resp_json[-1, , drop = FALSE]) # without -1 header becomes the first row 
+  colnames(pums_tibble) <- resp_json[1, ]
+  pums_tibble
 }
-
-
-pums_tibble_2024 <- get_pums_data_as_tibble__by_year(api_key, c("2024"), numeric_vars = c("AGEP", "PWGTP"))
-
-print(pums_tibble_2024)
-
-
 
 ```
 
 
+```{r}
+# testing
+pums_tibble_2024 <- get_pums_data_as_tibble__by_year(api_key, c("2024"), numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP"))
+print(pums_tibble_2024)
+
+#pums_tibble_2023 <- get_pums_data_as_tibble__by_year(api_key, c("2023"), numeric_vars = c("AGEP"))
+#print(pums_tibble_2023)
+
+#pums_tibble_2022 <- get_pums_data_as_tibble__by_year(api_key, c("2022"))
+#print(pums_tibble_2022)
+
+#pums_tibble_2021 <- get_pums_data_as_tibble__by_year(api_key, c("2021"))
+#print(pums_tibble_2021)
+
+##pums_tibble_2024_default <- get_pums_data_as_tibble__by_year(api_key)
+#print(pums_tibble_2024_default)
+
+```
+
+
+
+```{r}
+
+library(lubridate)
+
+parse_time_label_midpoint <- function(label) {
+  if(is.null(label) || is.na(label)) {
+    return(as.POSIXct(NA))
+  }
+  
+  parts <- strsplit(label, " to ")[[1]]
+  
+  if(length(parts) != 2) {
+    return(as.POSIXct(NA))
+  }
+  
+  start_clean <- gsub("\\.","",parts[1]) #double esacping it for R syntax 
+  end_clean   <- gsub("\\.","",parts[2])
+  
+  start_time <- lubridate::parse_date_time(start_clean, orders = "IMp")
+  end_time <- lubridate::parse_date_time(end_clean, orders = "IMp")
+  
+  if(is.na(start_time) || is.na(end_time)) {
+    return(as.POSIXct(NA))
+  }
+  
+  start_time + (end_time - start_time) / 2
+}
+
+
+convert_time_codes_to_midpoints <- function(codes, variable_metadata) {
+  result <- sapply(codes, function(code) {
+    if(is.na(code) || code == "") {
+      return(as.POSIXct(NA))
+    }
+    
+    label <- variable_metadata$values$item[[code]]
+    if(is.null(label)) {
+      return(as.POSIXct(NA))
+    }
+    parse_time_label_midpoint(label)
+  })
+   as.POSIXct(result, origin = "1970-01-01")
+}
+
+result <- parse_time_label_midpoint("6:30 a.m. to 6:34 a.m.")
+print(result)
+str(result)
+class(result)
+
+```
+
+
+```{r}
+
+get_pums_data_as_tibble__by_year_formatted <- function(api_key,
+                                                       year_str = c("2024", "2023", "2022", "2021"),
+                                                       numeric_vars = c("AGEP", "PWGTP")) {
+  pums_tibble <- get_pums_data_as_tibble__by_year(api_key, year_str, numeric_vars)
+  
+  variables_metadata <- get_variables_by_year(year_str)
+  
+  for (col_name in colnames(pums_tibble)) {
+    #print(variables_metadata[col_name])
+    if (col_name %in% c("JWAP", "JWDP")) {
+      pums_tibble[[col_name]] <- convert_time_codes_to_midpoints(pums_tibble[[col_name]], variables_metadata[[col_name]])
+    } else if (col_name %in% numeric_vars) {
+      pums_tibble[[col_name]] <- as.numeric(pums_tibble[[col_name]])
+      # } else if (col_name %in% categorical_vars) {
+      #   pums_tibble[[col_name]] <- factor(pums_tibble[[col_name]], ...)
+    }
+  }
+  pums_tibble
+}
+
+pums_tibble_2024_formatted <- get_pums_data_as_tibble__by_year_formatted(
+  api_key,
+  c("2024"),
+  numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
+)
+print(pums_tibble_2024_formatted)
+
+
+``` 
+
+
+
+```{r}
+get_pums_data_as_tibble__by_year_formatted_with_categorical_variables <-  function(api_key,
+                                                                                   year_str = c("2024", "2023", "2022", "2021"),
+                                                                                   numeric_vars = c("AGEP", "PWGTP"),
+                                                                                   categorical_vars = c("SEX")) {
+  #check for missing inputs
+  if (missing(api_key)) {
+    stop("apiKey are required")
+  }
+  
+  year_str <- match.arg(year_str, several.ok = FALSE)
+  
+  if (missing(year_str)) {
+    message("year_str is not supplied, 2024 is supplied as default")
+  }
+  variables_supported = load_variables_rds_by_year(year_str)
+  
+  allowed_numeric_vars <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
+  non_allowed_nuermic_var_in_input <- FALSE
+  is_pwgtp_part_of_input <- FALSE
+  number_of_numeric_values_outside_pwgtp <- 0
+  
+  # validate the input tags
+  for (v in numeric_vars) {
+    if (v == "PWGTP") {
+      is_pwgtp_part_of_input <- TRUE
+    }
+    v_allowed <- FALSE
+    for (allowed in allowed_numeric_vars) {
+      if (v == allowed) {
+        v_allowed <- TRUE
+      }
+    }
+    
+    if (!v_allowed) {
+      non_allowed_nuermic_var_in_input <- TRUE
+    }
+    else if (v != "PWGTP") {
+      number_of_numeric_values_outside_pwgtp <- number_of_numeric_values_outside_pwgtp + 1
+    }
+  }
+  
+  if (non_allowed_nuermic_var_in_input) {
+    stop("numeric_vars must only contain: ",
+         paste(allowed_numeric_vars, collapse = ", "))
+  }
+  
+  if (number_of_numeric_values_outside_pwgtp == 0) {
+    stop("at least one numeric var other than PWGTP must be specified in the input")
+  }
+  
+  if (!is_pwgtp_part_of_input) {
+    numeric_vars <- c(numeric_vars, "PWGTP")
+  }
+  
+  
+  allowed_categorical_vars <- c("FER", "HHL", "SCH", "SCHL", "SEX")
+  non_allowed_categorical_var_in_input <- FALSE
+  numb_categorial_variables <- 0
+  # validate the input tags
+  for (v in categorical_vars) {
+    v_allowed <- FALSE
+    for (allowed in allowed_categorical_vars) {
+      if (v == allowed) {
+        v_allowed <- TRUE
+        numb_categorial_variables <- numb_categorial_variables + 1
+      }
+    }
+    
+    if (!v_allowed) {
+      non_allowed_categorical_var_in_input <- TRUE
+    }
+  }
+  
+  if (non_allowed_categorical_var_in_input) {
+    stop(
+      "categorical_vars must only contain: ",
+      paste(allowed_categorical_vars, collapse = ", ")
+    )
+  }
+  
+  if (numb_categorial_variables == 0) {
+    stop(
+      "at least one valid categorical must be specified in the input. categorical_vars must only contain: ",
+      paste(allowed_categorical_vars, collapse = ", ")
+    )
+  }
+  
+  url <- paste0(
+    "https://api.census.gov/data/",
+    year_str,
+    "/acs/acs1/pums?get=",
+    paste(numeric_vars, collapse = ","),
+    ",",
+    paste(categorical_vars, collapse = ","),
+    "&SCHL=24&key=",
+    api_key
+  )
+  
+  pums_data <- GET(url)
+  resp_json <- fromJSON(rawToChar(pums_data$content))
+  
+  pums_tibble <- as_tibble(resp_json[-1, , drop = FALSE]) # without -1 header becomes the first row
+  colnames(pums_tibble) <- resp_json[1, ]
+  
+  
+  variables_metadata <- get_variables_by_year(year_str)
+  
+  for (col_name in colnames(pums_tibble)) {
+    #print(variables_metadata[col_name])
+    if (col_name %in% c("JWAP", "JWDP")) {
+      pums_tibble[[col_name]] <- convert_time_codes_to_midpoints(pums_tibble[[col_name]], variables_metadata[[col_name]])
+    } else if (col_name %in% numeric_vars) {
+      pums_tibble[[col_name]] <- as.numeric(pums_tibble[[col_name]])
+    } else if (col_name %in% categorical_vars) {
+      pums_tibble[[col_name]] <- factor(pums_tibble[[col_name]], ...)
+    }
+  }
+  
+  pums_tibble
+}
+
+
+pums_tibble_2024_formatted <- get_pums_data_as_tibble__by_year_formatted_with_categorical_variables(
+  api_key,
+  c("2024"),
+  numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
+)
+print(pums_tibble_2024_formatted)
+
+
+```
