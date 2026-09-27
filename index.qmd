@@ -50,8 +50,8 @@ library(dotenv)
 # load in env file for API key
 
 variables_base_list <- list( "AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP", "FER", "HHL", "SCH", "SCHL", "SEX")
-variables_2021_2022 <- append(variables_base_list,list("ST","STATE"))
-variables_2023_2024 <- append(variables_base_list,list("REGION","DIVISION"))
+variables_2021_2022 <- append(variables_base_list,list("ST","REGION","DIVISION"))
+variables_2023_2024 <- append(variables_base_list,list("STATE","REGION","DIVISION"))
 
 
 variables_by_year <- list(
@@ -324,6 +324,7 @@ class(result)
 ```
 
 
+
 ```{r}
 
 get_pums_data_as_tibble__by_year_formatted <- function(api_key,
@@ -356,13 +357,24 @@ print(pums_tibble_2024_formatted)
 
 ``` 
 
-
+```{r}
+match_allowed_value <- function(value, allowed_values) {
+   for (allowed in allowed_values) {
+      if (toupper(value) == toupper(allowed)) {
+        return(allowed)
+      }
+   }
+     return(NA)
+}
+```
 
 ```{r}
 get_pums_data_as_tibble__by_year_formatted_with_categorical_variables <-  function(api_key,
-                                                                                   year_str = c("2024", "2023", "2022", "2021"),
+                                                                                   year_str = c("2024"),
                                                                                    numeric_vars = c("AGEP", "PWGTP"),
-                                                                                   categorical_vars = c("SEX")) {
+                                                                                   categorical_vars = c("SEX"),
+                                                                                   geography_level = c("state"),
+                                                                                   geography_value = c("37")) {
   #check for missing inputs
   if (missing(api_key)) {
     stop("apiKey are required")
@@ -373,7 +385,7 @@ get_pums_data_as_tibble__by_year_formatted_with_categorical_variables <-  functi
   if (missing(year_str)) {
     message("year_str is not supplied, 2024 is supplied as default")
   }
-  variables_supported = load_variables_rds_by_year(year_str)
+  variables_supported <- load_variables_rds_by_year(year_str)
   
   allowed_numeric_vars <- c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
   non_allowed_nuermic_var_in_input <- FALSE
@@ -393,6 +405,7 @@ get_pums_data_as_tibble__by_year_formatted_with_categorical_variables <-  functi
     }
     
     if (!v_allowed) {
+      print(v)
       non_allowed_nuermic_var_in_input <- TRUE
     }
     else if (v != "PWGTP") {
@@ -446,6 +459,66 @@ get_pums_data_as_tibble__by_year_formatted_with_categorical_variables <-  functi
     )
   }
   
+
+   
+ for (v in categorical_vars) {
+    v_allowed <- FALSE
+    for (allowed in allowed_categorical_vars) {
+      if (v == allowed) {
+        v_allowed <- TRUE
+        numb_categorial_variables <- numb_categorial_variables + 1
+      }
+    }
+    
+    if (!v_allowed) {
+      non_allowed_categorical_var_in_input <- TRUE
+    }
+  }
+  
+    #let's validate geography 
+  
+    variables_metadata <- get_variables_by_year(year_str)
+
+  
+geography_level <- match_allowed_value(geography_level, c("Region", "Division", "State"))
+if (is.na(geography_level)) {
+  stop("geography_level must be one of: Region, Division, State")
+}
+
+if (geography_level == "State") {
+   if (year_str == "2021" || year_str == "2022") {
+    geography_var_name <- "ST"
+  } else {
+    geography_var_name <- "STATE"
+  }
+  geography_for_key <- "state"
+} else if (geography_level == "Division") {
+  geography_var_name <- "DIVISION"
+   geography_for_key <- "division"
+} else if (geography_level == "Region") {
+  geography_var_name <- "REGION"
+   geography_for_key <- "region"
+} 
+
+print(paste0("geography_var_name,", geography_var_name))
+
+
+allowed_geography_values <- names(variables_supported[[geography_var_name]]$values$item)
+print(allowed_geography_values)
+
+geography_value <- match_allowed_value(geography_value, c(allowed_geography_values, "all"))
+if (is.na(geography_value)) {
+  stop("geography_value must be 'all' or one of the following valid values for ", geography_level, ": ",
+       paste(allowed_geography_values, collapse = ", "))
+}
+
+
+geography_clause <- if (geography_value == "all") {
+  paste0("&for=", geography_for_key, ":*")
+} else {
+  paste0("&for=", geography_for_key, ":", geography_value)
+}
+  
   url <- paste0(
     "https://api.census.gov/data/",
     year_str,
@@ -453,9 +526,14 @@ get_pums_data_as_tibble__by_year_formatted_with_categorical_variables <-  functi
     paste(numeric_vars, collapse = ","),
     ",",
     paste(categorical_vars, collapse = ","),
+      ",",
+    geography_var_name,
+    geography_clause,
     "&SCHL=24&key=",
     api_key
   )
+  
+  print(url)
   
   pums_data <- GET(url)
   resp_json <- fromJSON(rawToChar(pums_data$content))
@@ -464,19 +542,22 @@ get_pums_data_as_tibble__by_year_formatted_with_categorical_variables <-  functi
   colnames(pums_tibble) <- resp_json[1, ]
   
   
-  variables_metadata <- get_variables_by_year(year_str)
   
   for (col_name in colnames(pums_tibble)) {
-    #print(variables_metadata[col_name])
+    #print(variables_supported[col_name])
     if (col_name %in% c("JWAP", "JWDP")) {
-      pums_tibble[[col_name]] <- convert_time_codes_to_midpoints(pums_tibble[[col_name]], variables_metadata[[col_name]])
-    } else if (col_name %in% numeric_vars) {
+      pums_tibble[[col_name]] <- convert_time_codes_to_midpoints(pums_tibble[[col_name]], variables_supported[[col_name]])
+    } else if (col_name %in% allowed_numeric_vars) {
       pums_tibble[[col_name]] <- as.numeric(pums_tibble[[col_name]])
-    } else if (col_name %in% categorical_vars) {
-      pums_tibble[[col_name]] <- factor(pums_tibble[[col_name]], ...)
-    }
+    } else if (col_name %in% allowed_categorical_vars) {
+     pums_tibble[[col_name]] <- factor(pums_tibble[[col_name]], levels = names(variables_supported[[col_name]]$values$item))
+     levels(pums_tibble[[col_name]]) <- unname(unlist(variables_supported[[col_name]]$values$item)) # labels
+
+     }
   }
   
+  
+  class(pums_tibble) <- c("census", class(pums_tibble))
   pums_tibble
 }
 
@@ -484,9 +565,82 @@ get_pums_data_as_tibble__by_year_formatted_with_categorical_variables <-  functi
 pums_tibble_2024_formatted <- get_pums_data_as_tibble__by_year_formatted_with_categorical_variables(
   api_key,
   c("2024"),
-  numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
+  numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP"),
+  categorical_vars = c("FER","HHL"),
+  geography_level = c("division"),
+  geography_value = c(2)
 )
-print(pums_tibble_2024_formatted)
+print(pums_tibble_2024_formatted,n = 200)
 
 
 ```
+
+##Combining Years
+
+```{r}
+get_pums_data_as_tibble_multiple_years <- function(api_key,
+                                                   year_strs = c("2024"),
+                                                   numeric_vars = c("AGEP", "PWGTP"),
+                                                   categorical_vars = c("SEX"),
+                                                   geography_level = c("state"),
+                                                   geography_value = c("37")) {
+  allowed_years <- c("2024","2023","2022","2021")
+  for(yr in year_strs) {
+    yr_allowed <- FALSE
+    for(allowed in allowed_years) {
+      if(yr == allowed) {
+        yr_allowed <- TRUE
+      }
+    }
+    if(!yr_allowed) {
+      if (!yr_allowed) {
+      stop("year_strs must only contain: ", paste(allowed_years, collapse = ", "))
+    }
+    }
+  }
+  
+  combined_tibble <- NULL
+   for(yr in year_strs) {
+     year_tibble <- get_pums_data_as_tibble__by_year_formatted_with_categorical_variables(
+      api_key,
+      yr,
+      numeric_vars = numeric_vars,
+      categorical_vars = categorical_vars,
+      geography_level = geography_level,
+      geography_value = geography_value
+    )
+     
+     #normalize ST to STATE to that combining works
+     if ("ST" %in% colnames(year_tibble)) {
+    colnames(year_tibble)[colnames(year_tibble) == "ST"] <- "STATE"
+  }
+     
+     year_tibble$year <- yr
+     
+     if(is.null(combined_tibble)) {
+       combined_tibble <- year_tibble
+     } else {
+       combined_tibble <- dplyr::bind_rows(combined_tibble, year_tibble)
+     }
+   }
+  
+  class(combined_tibble) <- c("census", class(combined_tibble))
+  combined_tibble
+  
+}
+
+pums_tible_2024_2021_with_state <- get_pums_data_as_tibble_multiple_years(
+  api_key,
+  c("2024","2021"),
+  numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP"),
+  categorical_vars = c("FER","HHL"),
+  geography_level = c("state"),
+  geography_value = c(37)
+)
+
+#pums_tible_2024_2021_with_state
+print(unique(pums_tible_2024_2021_with_state$year))
+table(pums_tible_2024_2021_with_state$year)
+
+```
+
