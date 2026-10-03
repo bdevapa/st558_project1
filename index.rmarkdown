@@ -872,3 +872,4 @@ pums_combined_tibble |>
 ```
 The Q1 for all the years is actually '0' indicating these are either remote workers, workers staying next door to work, and people without jobs. 
 While mean stayed around 10 minutes, the max value of outliers has increased gradually from 2021 to 2024. This suggests more workers moving to places that are far from work locations during the pandemic-remote-was-the-norm time. However they were called to work (RTO) which resulted in increased travel time. In the investigation pct_zero column clearly shows gradual decrease from 64.5% to 61.5%
+
