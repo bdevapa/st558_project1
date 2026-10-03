@@ -633,14 +633,158 @@ pums_tible_2024_2021_with_state <- get_pums_data_as_tibble_multiple_years(
   api_key,
   c("2024","2021"),
   numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP"),
-  categorical_vars = c("FER","HHL"),
+  categorical_vars = c("FER", "HHL", "SCH", "SCHL", "SEX"),
   geography_level = c("state"),
   geography_value = c(37)
 )
 
-#pums_tible_2024_2021_with_state
+pums_tible_2024_2021_with_state
 print(unique(pums_tible_2024_2021_with_state$year))
 table(pums_tible_2024_2021_with_state$year)
 
 ```
 
+# Part 2: Writing a Generic Function for Summarizing
+
+## Write custom summary function 
+
+- for summarizing mean and standard deviation of numerical variables and counts of categorial variables 
+
+```{r}
+summary.census <- function(x, numeric_vars = NULL, categorical_vars = NULL) {
+  
+  dflt_categorical_vars <- c("FER", "HHL", "SCH", "SCHL", "SEX","year")
+  dflt_numeric_vars <- c("AGEP", "GASP", "GRPIP",  "JWMNP")
+
+  if(is.null(numeric_vars)) {
+    numeric_vars = dflt_numeric_vars
+  } else {
+    for(n in numeric_vars) {
+      matched_value <- match_allowed_value(n,dflt_numeric_vars)
+      if(is.na(matched_value)) {
+        stop("numeric variables must only contain: ", paste(dflt_numeric_vars,collapse = ","))
+      }
+    }
+  }
+  
+  if(is.null(categorical_vars)) {
+    categorical_vars = dflt_categorical_vars
+  } else {
+    for(c in categorical_vars) {
+      matched_value <- match_allowed_value(c,dflt_categorical_vars)
+      if(is.na(matched_value)) {
+        stop("numeric variables must only contain: ", paste(dflt_categorical_vars,collapse = ","))
+      }
+    }
+  }
+  
+categorical_vars <- categorical_vars[categorical_vars %in% colnames(x)] 
+ numeric_vars <- numeric_vars[numeric_vars %in% colnames(x)]
+ 
+ if(length(categorical_vars) == 0) {
+   warning("None of the requested categorical_vars are present in the tibble - no categorical summary will be produced")
+ }
+ 
+  if(length(numeric_vars) == 0) {
+   warning("None of the requested numeric_vars are present in the tibble - no numerical summary will be produced")
+ }
+  
+  summary_result <- list()
+  
+  for(v in numeric_vars) {
+    
+    numeric_vector <- x[[v]]
+    weight_vector <- x[["PWGTP"]]
+    sample_mean <- sum(numeric_vector * weight_vector) / sum(weight_vector)
+    sample_sd = sqrt(sum(numeric_vector^2 * weight_vector)/sum(weight_vector) - sample_mean^2)
+    
+    summary_result[[v]] <- list(mean = sample_mean, sd = sample_sd)
+  }
+  
+  for(c in categorical_vars) {
+    summary_result[[c]] <- table(x[[c]])
+  }
+  
+  summary_result
+
+}
+
+```
+
+
+## Write custom plot function 
+
+-  The plot should create a boxplot of the numeric variable at the levels of the categorical variable
+-  It should take one numerical and one caterorical variable as inputs 
+
+```{r}
+summary(pums_tible_2024_2021_with_state)
+```
+
+Now let's construct a label query so that I can display it on the boxplot 
+
+```{r}
+
+
+get_label_for_var <- function(var) {
+  
+  variables_metadata <- load_variables_rds_by_year("2024") #let's use default 2024
+  #I also checked ST and STATE variables between different years the labels are same 
+  var_label <- variables_metadata[[var]]$label
+  if (is.null(var_label)) {
+    var_label <- var_var   # "year" has no metadata entry -- fall back to the raw name
+  }
+
+  var_label
+}
+
+```
+
+
+
+```{r}
+plot.census <- function(x, numeric_var, categorical_var) {
+  if(missing(numeric_var) || missing(categorical_var)) {
+    stop("both numeric_var and categorical_var are required")
+  }
+  
+  allowed_categorical_vars <- c("FER", "HHL", "SCH", "SCHL", "SEX","year")
+  allowed_numeric_vars <- c("AGEP", "GASP", "GRPIP",  "JWMNP")
+  
+  numeric_var <- match_allowed_value(numeric_var, allowed_numeric_vars)
+  if(is.na(numeric_var)) {
+    stop("numeric_var must be one of: ", paste(allowed_numeric_vars, collapse = ","))
+  }
+  col_names_tibble <- colnames(x)
+  
+  if(!(numeric_var %in% col_names_tibble)) {
+    stop("numeric_var is not part of avaiable tibble columns: ", paste(col_names_tibble, collapse = ","))
+  }
+  
+  categorical_var <- match_allowed_value(categorical_var, allowed_categorical_vars)
+  if(is.na(categorical_var)) {
+    stop("categorical_var must be one of: ", paste(allowed_categorical_vars, collapse = ","))
+  }
+  
+   if(!(categorical_var %in% col_names_tibble)) {
+    stop("categorical_var is not part of avaiable tibble columns: ", paste(col_names_tibble, collapse = ","))
+   }
+  
+  ggplot(x, aes(x = get(categorical_var), y = get(numeric_var), weight = PWGTP)) + 
+    geom_boxplot() + 
+    labs(x = paste0(categorical_var, "(", get_label_for_var(categorical_var), ")"),
+         y = paste0(numeric_var, "(", get_label_for_var(numeric_var), ")"),
+         title = paste(numeric_var, " by ", categorical_var),
+         subtitle = "Weighted by PWGTP (survey weight)",
+         caption = "Source: Census PUMS data")
+  
+}
+
+```
+
+Now let's test the `plot` function
+
+```{r}
+plot(pums_tible_2024_2021_with_state,"JWMNP","SEX")
+
+```
