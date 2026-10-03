@@ -4,6 +4,8 @@ format: html
 editor: visual
 ---
 
+#TODO: Should I keep this as Qmd or a base R file is enough -- I will have more clarity as I move forward making changes
+
 # Overall Goal
 
 Our goal is to write functions that will manipulate and process data sets that come from a census API. We’ll create generic functions to automatically summarize and plot certain returned data
@@ -30,7 +32,7 @@ We aren’t going to worry about Puerto Rico data so focusing on the basic PUMS 
 
 ## Users choice
 
-Allow user to choose certain variables and conditions - essentially allow users to select numerical and categorical variables, and geography filters 
+Allow user to choose certian variables and conditions TODO: come back to this and fill what is allowed
 
 # Part 1: Data Processing
 
@@ -46,22 +48,9 @@ library(jsonlite)
 
 # load in env file for API key
 
-variables_base_list <- list(
-  "AGEP",
-  "GASP",
-  "GRPIP",
-  "JWAP",
-  "JWDP",
-  "JWMNP",
-  "PWGTP",
-  "FER",
-  "HHL",
-  "SCH",
-  "SCHL",
-  "SEX"
-)
-variables_2021_2022 <- append(variables_base_list, list("ST", "REGION", "DIVISION"))
-variables_2023_2024 <- append(variables_base_list, list("STATE", "REGION", "DIVISION"))
+variables_base_list <- list( "AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP", "FER", "HHL", "SCH", "SCHL", "SEX")
+variables_2021_2022 <- append(variables_base_list,list("ST","REGION","DIVISION"))
+variables_2023_2024 <- append(variables_base_list,list("STATE","REGION","DIVISION"))
 
 
 variables_by_year <- list(
@@ -71,29 +60,84 @@ variables_by_year <- list(
   "2024" = variables_2023_2024
 )
 
-get_variables_by_year <- function(year_str) {
-  if (!is.character(year_str)) {
-    warning(
-      "Year should be passed as character string like \"2024\". coercing to character string to make code work"
-    )
+get_variables_by_year <- function(year_str){
+  
+  if(!is.character(year_str)) {
+    warning("Year should be passed as character string like \"2024\". coercing to character string to make code work")
     year_str <- as.character(year_str)
   }
   
-  url <- paste0("https://api.census.gov/data/",
-                year_str,
-                "/acs/acs1/pumspr/variables.json")
+  url <- paste0(
+    "https://api.census.gov/data/",
+    year_str,
+    "/acs/acs1/pumspr/variables.json"
+  )
   api_variables <- GET(url)
-
   
-  variables_response <- fromJSON(rawToChar(api_variables$content), simplifyVector = TRUE)
-  filtered_variables <-   variables_response$variables[names(variables_response$variables) %in% variables_by_year[[year_str]]]
+  print(status_code(api_variables))
+  
+  print(names(api_variables))          # does this include "variables" at all?
+  print(length(api_variables$variables))
+  
+   variables_response <- fromJSON(rawToChar(api_variables$content), simplifyVector = TRUE)
+
+ # variables_response$variables
+ # names(variables_response$variables)
+ # variables_by_year[year_str]
+ filtered_variables <-   variables_response$variables[names(variables_response$variables) %in% variables_by_year[[year_str]]]
   
 }
 
+# for (year in names(variables_by_year)) {
+#   var_yr_variables_temp <- get_variables_by_year(year)
+# 
+#   cat("Year:", year,
+#       "- length(names):", length(names(var_yr_variables_temp)),
+#       "- length(sapply):", length(sapply(var_yr_variables_temp, function(v) v$predicateType)),
+#       "\n")
+# }
+
+# var_yr_variables_temp <- get_variables_by_year("2024")
+# variable_table_2024 <- data.frame(
+#   variable = names(var_yr_variables_temp),
+#   predicateType = sapply(var_yr_variables_temp, function(v) v$predicateType)
+# )
+# 
+# print(variable_table_2024)
+# 
+# var_yr_variables_temp <- get_variables_by_year("2023")
+# variable_table_2023 <- data.frame(
+#   variable = names(var_yr_variables_temp),
+#   predicateType = sapply(var_yr_variables_temp, function(v) v$predicateType)
+# )
+# 
+# print(variable_table_2023)
+
+
+
+var_yr_variables_temp <- get_variables_by_year("2022")
+
+print(status_code(GET(paste0("https://api.census.gov/data/2022/acs/acs1/pumspr/variables.json"))))
+cat("length(names):", length(names(var_yr_variables_temp)),
+    "- length(sapply):", length(sapply(var_yr_variables_temp, function(v) v$predicateType)), "\n")
+
+# var_yr_variables_temp <- get_variables_by_year("2021")
+# variable_table_2021 <- data.frame(
+#   variable = names(var_yr_variables_temp),
+#   predicateType = sapply(var_yr_variables_temp, function(v) v$predicateType)
+# )
+# 
+# print(variable_table_2021)
+
+
 for (year in names(variables_by_year)) {
+  
   file_name <- paste0("data/variables_", year, ".rds")
   
-  saveRDS(get_variables_by_year(year), file_name)
+  saveRDS(
+    get_variables_by_year(year),
+    file_name
+  )
 }
 
 
@@ -109,9 +153,16 @@ Write a function to query the PUMS API and return a nicely formatted tibble
 - 2023
 - 2024
 
-However let's first create a helper method to load rds files by year 
-
 ```{r}
+
+library(jsonlite)
+library(tidyverse)
+library(dotenv)
+
+# load in env file for API key
+load_dot_env()
+
+api_key <- Sys.getenv("CENSUS_API_KEY")
 
 load_variables_rds_by_year <- function(year_str  = c("2024", "2023", "2022", "2021")) {
   year_str <- match.arg(year_str, several.ok = FALSE)
@@ -121,13 +172,10 @@ load_variables_rds_by_year <- function(year_str  = c("2024", "2023", "2022", "20
 
 ```
 
-Now let's create a basic version of querying pumps api with specification in the project statement
-Also in this initial implemented only numerical variable queries are implemented - therefore we will leave SCHL=24 which works as filter 
-
 ```{r}
 
-get_pums_data_as_tibble_numeric_vars_only_by_year <- function(api_key,
-                                             year_str = c("2024", "2023", "2022", "2021"), #by putting 2024 as the beginning it becomes a default value when it is not specified 
+get_pums_data_as_tibble__by_year <- function(api_key,
+                                             year_str = c("2024", "2023", "2022", "2021"),
                                              numeric_vars = c("AGEP", "PWGTP")) {
   #check for missing inputs
   if (missing(api_key)) {
@@ -199,17 +247,10 @@ get_pums_data_as_tibble_numeric_vars_only_by_year <- function(api_key,
 
 ```
 
-Now let's test the above implementation 
-Most of the test code has been commented out so to keep html output small 
-
-
 ```{r}
 # testing
-load_dot_env()
-api_key <- Sys.getenv("CENSUS_API_KEY")
-
-pums_tibble_2024 <- get_pums_data_as_tibble_numeric_vars_only_by_year(api_key, c("2024"), numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP"))
-#print(pums_tibble_2024)
+pums_tibble_2024 <- get_pums_data_as_tibble__by_year(api_key, c("2024"), numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP"))
+print(pums_tibble_2024)
 
 #pums_tibble_2023 <- get_pums_data_as_tibble__by_year(api_key, c("2023"), numeric_vars = c("AGEP"))
 #print(pums_tibble_2023)
@@ -224,8 +265,6 @@ pums_tibble_2024 <- get_pums_data_as_tibble_numeric_vars_only_by_year(api_key, c
 #print(pums_tibble_2024_default)
 
 ```
-
-Use lubridate to create a helper method to parse and format time variables 
 
 ```{r}
 
@@ -271,11 +310,6 @@ convert_time_codes_to_midpoints <- function(codes, variable_metadata) {
    as.POSIXct(result, origin = "1970-01-01")
 }
 
-```
-
-Now let's test the helper method to make it is working as expected 
-
-```{r}
 result <- parse_time_label_midpoint("6:30 a.m. to 6:34 a.m.")
 print(result)
 str(result)
@@ -283,14 +317,12 @@ class(result)
 
 ```
 
-
-
 ```{r}
 
-get_pums_data_as_tibble_numeric_vars_only_by_year_formatted <- function(api_key,
+get_pums_data_as_tibble__by_year_formatted <- function(api_key,
                                                        year_str = c("2024", "2023", "2022", "2021"),
                                                        numeric_vars = c("AGEP", "PWGTP")) {
-  pums_tibble <- get_pums_data_as_tibble_numeric_vars_only_by_year(api_key, year_str, numeric_vars)
+  pums_tibble <- get_pums_data_as_tibble__by_year(api_key, year_str, numeric_vars)
   
   variables_metadata <- get_variables_by_year(year_str)
   
@@ -300,44 +332,36 @@ get_pums_data_as_tibble_numeric_vars_only_by_year_formatted <- function(api_key,
       pums_tibble[[col_name]] <- convert_time_codes_to_midpoints(pums_tibble[[col_name]], variables_metadata[[col_name]])
     } else if (col_name %in% numeric_vars) {
       pums_tibble[[col_name]] <- as.numeric(pums_tibble[[col_name]])
+      # } else if (col_name %in% categorical_vars) {
+      #   pums_tibble[[col_name]] <- factor(pums_tibble[[col_name]], ...)
     }
   }
   pums_tibble
 }
-```
 
-Now let's test basic formatted tibble 
-
-```{r}
-pums_tibble_2024_formatted <- get_pums_data_as_tibble_numeric_vars_only_by_year_formatted(
+pums_tibble_2024_formatted <- get_pums_data_as_tibble__by_year_formatted(
   api_key,
   c("2024"),
   numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP")
 )
-#print(pums_tibble_2024_formatted)
+print(pums_tibble_2024_formatted)
 
 
-``` 
-
-Let's write a helper method that helps to match a single value against a set of valid values 
+```
 
 ```{r}
 match_allowed_value <- function(value, allowed_values) {
-  for (allowed in allowed_values) {
-    if (toupper(value) == toupper(allowed)) {
-      return(allowed)
-    }
-  }
-  return(NA)
+   for (allowed in allowed_values) {
+      if (toupper(value) == toupper(allowed)) {
+        return(allowed)
+      }
+   }
+     return(NA)
 }
 ```
 
-So far we have only implemented numerical variable queries 
-Let's start implementing queries that include categorical variables now 
-Also we are adding filters based on geography 
-
 ```{r}
-get_pums_data_as_tibble_final<-  function(api_key,
+get_pums_data_as_tibble__by_year_formatted_with_categorical_variables <-  function(api_key,
                                                                                    year_str = c("2024", "2023", "2022", "2021"),
                                                                                    numeric_vars = c("AGEP", "PWGTP"),
                                                                                    categorical_vars = c("SEX"),
@@ -395,7 +419,7 @@ get_pums_data_as_tibble_final<-  function(api_key,
   }
   
   
-  allowed_categorical_vars <- c("FER", "HHL", "SCH", "SCHL", "SEX") # notice SCHL is a cat variable that can take different values
+  allowed_categorical_vars <- c("FER", "HHL", "SCH", "SCHL", "SEX")
   non_allowed_categorical_var_in_input <- FALSE
   numb_categorial_variables <- 0
   # validate the input tags
@@ -426,50 +450,66 @@ get_pums_data_as_tibble_final<-  function(api_key,
       paste(allowed_categorical_vars, collapse = ", ")
     )
   }
+  
 
-  #let's validate geography
-  
-  variables_metadata <- get_variables_by_year(year_str)
-  
-  geography_level <- match_allowed_value(geography_level, c("Region", "Division", "State"))
-  if (is.na(geography_level)) {
-    stop("geography_level must be one of: Region, Division, State")
-  }
-  
-  if (geography_level == "State") {
-    if (year_str == "2021" || year_str == "2022") {
-      geography_var_name <- "ST"
-    } else {
-      geography_var_name <- "STATE"
+   
+ for (v in categorical_vars) {
+    v_allowed <- FALSE
+    for (allowed in allowed_categorical_vars) {
+      if (v == allowed) {
+        v_allowed <- TRUE
+        numb_categorial_variables <- numb_categorial_variables + 1
+      }
     }
-    geography_for_key <- "state"
-  } else if (geography_level == "Division") {
-    geography_var_name <- "DIVISION"
-    geography_for_key <- "division"
-  } else if (geography_level == "Region") {
-    geography_var_name <- "REGION"
-    geography_for_key <- "region"
+    
+    if (!v_allowed) {
+      non_allowed_categorical_var_in_input <- TRUE
+    }
   }
   
+    #let's validate geography 
   
-  allowed_geography_values <- names(variables_supported[[geography_var_name]]$values$item)
+    variables_metadata <- get_variables_by_year(year_str)
+
   
-  geography_value <- match_allowed_value(geography_value, c(allowed_geography_values, "all"))
-  if (is.na(geography_value)) {
-    stop(
-      "geography_value must be 'all' or one of the following valid values for ",
-      geography_level,
-      ": ",
-      paste(allowed_geography_values, collapse = ", ")
-    )
-  }
-  
-  
-  geography_clause <- if (geography_value == "all") {
-    paste0("&for=", geography_for_key, ":*")
+geography_level <- match_allowed_value(geography_level, c("Region", "Division", "State"))
+if (is.na(geography_level)) {
+  stop("geography_level must be one of: Region, Division, State")
+}
+
+if (geography_level == "State") {
+   if (year_str == "2021" || year_str == "2022") {
+    geography_var_name <- "ST"
   } else {
-    paste0("&for=", geography_for_key, ":", geography_value)
+    geography_var_name <- "STATE"
   }
+  geography_for_key <- "state"
+} else if (geography_level == "Division") {
+  geography_var_name <- "DIVISION"
+   geography_for_key <- "division"
+} else if (geography_level == "Region") {
+  geography_var_name <- "REGION"
+   geography_for_key <- "region"
+} 
+
+print(paste0("geography_var_name,", geography_var_name))
+
+
+allowed_geography_values <- names(variables_supported[[geography_var_name]]$values$item)
+print(allowed_geography_values)
+
+geography_value <- match_allowed_value(geography_value, c(allowed_geography_values, "all"))
+if (is.na(geography_value)) {
+  stop("geography_value must be 'all' or one of the following valid values for ", geography_level, ": ",
+       paste(allowed_geography_values, collapse = ", "))
+}
+
+
+geography_clause <- if (geography_value == "all") {
+  paste0("&for=", geography_for_key, ":*")
+} else {
+  paste0("&for=", geography_for_key, ":", geography_value)
+}
   
   url <- paste0(
     "https://api.census.gov/data/",
@@ -478,80 +518,82 @@ get_pums_data_as_tibble_final<-  function(api_key,
     paste(numeric_vars, collapse = ","),
     ",",
     paste(categorical_vars, collapse = ","),
-    ",",
+      ",",
     geography_var_name,
     geography_clause,
-    "&key=",# &SCHL=24 is now removed
+    "&SCHL=24&key=",
     api_key
   )
+  
+  print(url)
+  
   pums_data <- GET(url)
   resp_json <- fromJSON(rawToChar(pums_data$content))
   
   pums_tibble <- as_tibble(resp_json[-1, , drop = FALSE]) # without -1 header becomes the first row
   colnames(pums_tibble) <- resp_json[1, ]
   
+  
+  
   for (col_name in colnames(pums_tibble)) {
+    #print(variables_supported[col_name])
     if (col_name %in% c("JWAP", "JWDP")) {
       pums_tibble[[col_name]] <- convert_time_codes_to_midpoints(pums_tibble[[col_name]], variables_supported[[col_name]])
     } else if (col_name %in% allowed_numeric_vars) {
       pums_tibble[[col_name]] <- as.numeric(pums_tibble[[col_name]])
     } else if (col_name %in% allowed_categorical_vars) {
-      # adding factors for all categorical values based on distinct values that they support
-      pums_tibble[[col_name]] <- factor(pums_tibble[[col_name]],
-                                        levels = names(variables_supported[[col_name]]$values$item))
-      levels(pums_tibble[[col_name]]) <- unname(unlist(variables_supported[[col_name]]$values$item)) # labels
-      
-    }
+     pums_tibble[[col_name]] <- factor(pums_tibble[[col_name]], levels = names(variables_supported[[col_name]]$values$item))
+     levels(pums_tibble[[col_name]]) <- unname(unlist(variables_supported[[col_name]]$values$item)) # labels
+
+     }
   }
+  
   
   class(pums_tibble) <- c("census", class(pums_tibble))
   pums_tibble
 }
 
-```
 
-Let's test the complete PUMS API data query implementation 
-
-```{r}
-
-pums_tibble_2024_formatted <- get_pums_data_as_tibble_final(
+pums_tibble_2024_formatted <- get_pums_data_as_tibble__by_year_formatted_with_categorical_variables(
   api_key,
   c("2024"),
   numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP"),
-  categorical_vars = c("FER","HHL","SCHL"),
-  geography_level = c("state"),
-  geography_value = c(47)
+  categorical_vars = c("FER","HHL"),
+  geography_level = c("division"),
+  geography_value = c(2)
 )
+print(pums_tibble_2024_formatted,n = 200)
+
+
 ```
 
-## Combining tibbles from different years 
-
-Now let's write a function that can take multiple valid years and return combined tibble 
+##Combining Years
 
 ```{r}
 get_pums_data_as_tibble_multiple_years <- function(api_key,
-                                                   year_strs,
+                                                   year_strs = c("2024"),
                                                    numeric_vars = c("AGEP", "PWGTP"),
                                                    categorical_vars = c("SEX"),
                                                    geography_level = c("state"),
                                                    geography_value = c("37")) {
-  allowed_years <- c("2024", "2023", "2022", "2021")
-  for (yr in year_strs) {
+  allowed_years <- c("2024","2023","2022","2021")
+  for(yr in year_strs) {
     yr_allowed <- FALSE
-    for (allowed in allowed_years) {
-      if (yr == allowed) {
+    for(allowed in allowed_years) {
+      if(yr == allowed) {
         yr_allowed <- TRUE
       }
     }
-    if (!yr_allowed) {
-        stop("year_strs must only contain: ",
-             paste(allowed_years, collapse = ", "))
+    if(!yr_allowed) {
+      if (!yr_allowed) {
+      stop("year_strs must only contain: ", paste(allowed_years, collapse = ", "))
+    }
     }
   }
   
   combined_tibble <- NULL
-  for (yr in year_strs) {
-    year_tibble <- get_pums_data_as_tibble_final(
+   for(yr in year_strs) {
+     year_tibble <- get_pums_data_as_tibble__by_year_formatted_with_categorical_variables(
       api_key,
       yr,
       numeric_vars = numeric_vars,
@@ -559,48 +601,46 @@ get_pums_data_as_tibble_multiple_years <- function(api_key,
       geography_level = geography_level,
       geography_value = geography_value
     )
-    
-    #normalize ST to STATE to that combining works
-    if ("ST" %in% colnames(year_tibble)) {
-      colnames(year_tibble)[colnames(year_tibble) == "ST"] <- "STATE"
-    }
-    
-    year_tibble$year <- yr
-    
-    if (is.null(combined_tibble)) {
-      combined_tibble <- year_tibble
-    } else {
-      combined_tibble <- dplyr::bind_rows(combined_tibble, year_tibble)
-    }
+     
+     #normalize ST to STATE to that combining works
+     if ("ST" %in% colnames(year_tibble)) {
+    colnames(year_tibble)[colnames(year_tibble) == "ST"] <- "STATE"
   }
+     
+     year_tibble$year <- yr
+     
+     if(is.null(combined_tibble)) {
+       combined_tibble <- year_tibble
+     } else {
+       combined_tibble <- dplyr::bind_rows(combined_tibble, year_tibble)
+     }
+   }
   
   class(combined_tibble) <- c("census", class(combined_tibble))
   combined_tibble
   
 }
 
-```
-
-Now let's test this tibble using multiple years (2024 through 2021) with state=37 as geography filter 
-
-```{r}
-
-pums_combined_tibble <- get_pums_data_as_tibble_multiple_years(
+pums_tible_2024_2021_with_state <- get_pums_data_as_tibble_multiple_years(
   api_key,
-  c("2024","2023","2022","2021"),
+  c("2024","2021"),
   numeric_vars = c("AGEP", "GASP", "GRPIP", "JWAP", "JWDP", "JWMNP", "PWGTP"),
   categorical_vars = c("FER", "HHL", "SCH", "SCHL", "SEX"),
   geography_level = c("state"),
   geography_value = c(37)
 )
 
+pums_tible_2024_2021_with_state
+print(unique(pums_tible_2024_2021_with_state$year))
+table(pums_tible_2024_2021_with_state$year)
+
 ```
 
 # Part 2: Writing a Generic Function for Summarizing
 
-## Write custom summary function 
+## Write custom summary function
 
-- for summarizing mean and standard deviation of numerical variables and counts of categorial variables 
+- for summarizing mean and standard deviation of numerical variables and counts of categorial variables
 
 ```{r}
 summary.census <- function(x, numeric_vars = NULL, categorical_vars = NULL) {
@@ -663,20 +703,16 @@ categorical_vars <- categorical_vars[categorical_vars %in% colnames(x)]
 
 ```
 
-Now let's test summary function that we just created 
+## Write custom plot function
+
+- The plot should create a boxplot of the numeric variable at the levels of the categorical variable
+- It should take one numerical and one caterorical variable as inputs
 
 ```{r}
-summary(pums_combined_tibble)
+summary(pums_tible_2024_2021_with_state)
 ```
 
-
-## Write custom plot function 
-
--  The plot should create a boxplot of the numeric variable at the levels of the categorical variable
--  It should take one numerical and one caterorical variable as inputs 
-
-
-Before that let's construct a label query so that I can display it on the boxplot 
+Now let's construct a label query so that I can display it on the boxplot
 
 ```{r}
 
@@ -687,15 +723,13 @@ get_label_for_var <- function(var) {
   #I also checked ST and STATE variables between different years the labels are same 
   var_label <- variables_metadata[[var]]$label
   if (is.null(var_label)) {
-    var_label <- var   # "year" has no metadata entry -- fall back to the raw name
+    var_label <- var_var   # "year" has no metadata entry -- fall back to the raw name
   }
 
   var_label
 }
 
 ```
-
-Implementing the actual `plot` function 
 
 ```{r}
 plot.census <- function(x, numeric_var, categorical_var) {
@@ -713,7 +747,7 @@ plot.census <- function(x, numeric_var, categorical_var) {
   col_names_tibble <- colnames(x)
   
   if(!(numeric_var %in% col_names_tibble)) {
-    stop("numeric_var is not part of available tibble columns: ", paste(col_names_tibble, collapse = ","))
+    stop("numeric_var is not part of avaiable tibble columns: ", paste(col_names_tibble, collapse = ","))
   }
   
   categorical_var <- match_allowed_value(categorical_var, allowed_categorical_vars)
@@ -722,7 +756,7 @@ plot.census <- function(x, numeric_var, categorical_var) {
   }
   
    if(!(categorical_var %in% col_names_tibble)) {
-    stop("categorical_var is not part of available tibble columns: ", paste(col_names_tibble, collapse = ","))
+    stop("categorical_var is not part of avaiable tibble columns: ", paste(col_names_tibble, collapse = ","))
    }
   
   ggplot(x, aes(x = get(categorical_var), y = get(numeric_var), weight = PWGTP)) + 
@@ -740,5 +774,6 @@ plot.census <- function(x, numeric_var, categorical_var) {
 Now let's test the `plot` function
 
 ```{r}
-plot(pums_combined_tibble,"GRPIP","SEX")
+plot(pums_tible_2024_2021_with_state,"JWMNP","SEX")
+
 ```
