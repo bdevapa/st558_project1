@@ -646,10 +646,14 @@ table(pums_tible_2024_2021_with_state$year)
 
 # Part 2: Writing a Generic Function for Summarizing
 
+## Write custom summary function 
+
+- for summarizing mean and standard deviation of numerical variables and counts of categorial variables 
+
 ```{r}
 summary.census <- function(x, numeric_vars = NULL, categorical_vars = NULL) {
   
-  dflt_categorical_vars <- c("FER", "HHL", "SCH", "SCHL", "SEX")
+  dflt_categorical_vars <- c("FER", "HHL", "SCH", "SCHL", "SEX","year")
   dflt_numeric_vars <- c("AGEP", "GASP", "GRPIP",  "JWMNP")
 
   if(is.null(numeric_vars)) {
@@ -674,17 +678,21 @@ summary.census <- function(x, numeric_vars = NULL, categorical_vars = NULL) {
     }
   }
   
-  summary_result <- list()
+categorical_vars <- categorical_vars[categorical_vars %in% colnames(x)] 
+ numeric_vars <- numeric_vars[numeric_vars %in% colnames(x)]
+ 
+ if(length(categorical_vars) == 0) {
+   warning("None of the requested categorical_vars are present in the tibble - no categorical summary will be produced")
+ }
+ 
+  if(length(numeric_vars) == 0) {
+   warning("None of the requested numeric_vars are present in the tibble - no numerical summary will be produced")
+ }
   
-  print(class(numeric_vars))
-print(length(numeric_vars))
-
+  summary_result <- list()
   
   for(v in numeric_vars) {
     
-    print(v)
-print(length(v))
-
     numeric_vector <- x[[v]]
     weight_vector <- x[["PWGTP"]]
     sample_mean <- sum(numeric_vector * weight_vector) / sum(weight_vector)
@@ -703,6 +711,50 @@ print(length(v))
 
 ```
 
+
+## Write custom plot function 
+
+-  The plot should create a boxplot of the numeric variable at the levels of the categorical variable
+-  It should take one numerical and one caterorical variable as inputs 
+
 ```{r}
 summary(pums_tible_2024_2021_with_state)
+```
+```{r}
+plot.census <- function(x, numeric_var, categorical_var) {
+  if(missing(numeric_var) || missing(categorical_var)) {
+    stop("both numeric_var and categorical_var are required")
+  }
+  
+  allowed_categorical_vars <- c("FER", "HHL", "SCH", "SCHL", "SEX","year")
+  allowed_numeric_vars <- c("AGEP", "GASP", "GRPIP",  "JWMNP")
+  
+  numeric_var <- match_allowed_value(numeric_var, allowed_numeric_vars)
+  if(is.na(numeric_var)) {
+    stop("numeric_var must be one of: ", paste(allowed_numeric_vars, collapse = ","))
+  }
+  col_names_tibble <- colnames(x)
+  
+  if(!(numeric_var %in% col_names_tibble)) {
+    stop("numeric_var is not part of avaiable tibble columns: ", paste(col_names_tibble, collapse = ","))
+  }
+  
+  categorical_var <- match_allowed_value(categorical_var, allowed_categorical_vars)
+  if(is.na(categorical_var)) {
+    stop("categorical_var must be one of: ", paste(allowed_categorical_vars, collapse = ","))
+  }
+  
+   if(!(categorical_var %in% col_names_tibble)) {
+    stop("categorical_var is not part of avaiable tibble columns: ", paste(col_names_tibble, collapse = ","))
+   }
+  
+  ggplot(x, aes(x = get(categorical_var), y = get(numeric_var), weight = PWGTP)) + 
+    geom_boxplot() + 
+    labs(x = categorical_var, y = numeric_var)
+  
+  
+  
+  
+}
+
 ```
