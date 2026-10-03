@@ -1118,6 +1118,89 @@ $SEX
 213464 226293 </code></pre>
 </div>
 </div>
+<p>let’s see if the GRPIP changes by Year</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb48"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(pums_combined_tibble,<span class="at">numeric_vars =</span> <span class="st">"GRPIP"</span>, <span class="at">categorical_vars =</span> <span class="st">"Year"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in summary.census(pums_combined_tibble, numeric_vars = "GRPIP", : None
+of the requested categorical_vars are present in the tibble - no categorical
+summary will be produced</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$GRPIP
+$GRPIP$mean
+[1] 9.84008
+
+$GRPIP$sd
+[1] 21.16603</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(pums_combined_tibble,<span class="at">numeric_var =</span> <span class="st">"GRPIP"</span>, <span class="at">categorical_var =</span> <span class="st">"Year"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-26-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The rent situation hasn’t improved much over the years per this plot</p>
+</section>
+<section id="investigation-3-jwmnp-vs-year" class="level2">
+<h2 class="anchored" data-anchor-id="investigation-3-jwmnp-vs-year">Investigation-3 JWMNP vs year</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb52"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(pums_combined_tibble,<span class="at">numeric_vars =</span> <span class="st">"JWMNP"</span>, <span class="at">categorical_vars =</span> <span class="st">"year"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$JWMNP
+$JWMNP$mean
+[1] 10.0334
+
+$JWMNP$sd
+[1] 18.15596
+
+
+$year
+
+  2021   2022   2023   2024 
+104337 109230 111920 114270 </code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb54"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(pums_combined_tibble,<span class="at">numeric_var =</span> <span class="st">"JWMNP"</span>, <span class="at">categorical_var =</span> <span class="st">"year"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/unnamed-chunk-27-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb55"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>pums_combined_tibble <span class="sc">|&gt;</span></span>
+<span id="cb55-2"><a href="#cb55-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(year) <span class="sc">|&gt;</span></span>
+<span id="cb55-3"><a href="#cb55-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
+<span id="cb55-4"><a href="#cb55-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">median_jwmnp =</span> <span class="fu">median</span>(JWMNP, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb55-5"><a href="#cb55-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">pct_zero =</span> <span class="fu">mean</span>(JWMNP <span class="sc">==</span> <span class="dv">0</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb55-6"><a href="#cb55-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">q1 =</span> <span class="fu">quantile</span>(JWMNP,<span class="fl">0.25</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb55-7"><a href="#cb55-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">q3 =</span> <span class="fu">quantile</span>(JWMNP, <span class="fl">0.75</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb55-8"><a href="#cb55-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">iqr =</span> q3<span class="sc">-</span>q1,</span>
+<span id="cb55-9"><a href="#cb55-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">upper_fence =</span> q3 <span class="sc">+</span> <span class="fl">1.5</span> <span class="sc">*</span> iqr,</span>
+<span id="cb55-10"><a href="#cb55-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">lower_fence =</span> q1 <span class="sc">-</span> <span class="fl">1.5</span> <span class="sc">*</span> iqr,</span>
+<span id="cb55-11"><a href="#cb55-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">actual_max =</span> <span class="fu">max</span>(JWMNP, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb55-12"><a href="#cb55-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">actual_min =</span> <span class="fu">min</span>(JWMNP, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb55-13"><a href="#cb55-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">has_high_outliers =</span> actual_max <span class="sc">&gt;</span> upper_fence,</span>
+<span id="cb55-14"><a href="#cb55-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">has_low_outliers =</span> actual_min <span class="sc">&lt;</span> lower_fence </span>
+<span id="cb55-15"><a href="#cb55-15" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 4 × 12
+  year  median_jwmnp pct_zero    q1    q3   iqr upper_fence lower_fence
+  &lt;chr&gt;        &lt;dbl&gt;    &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;       &lt;dbl&gt;       &lt;dbl&gt;
+1 2021             0    0.646     0    15    15        37.5       -22.5
+2 2022             0    0.629     0    15    15        37.5       -22.5
+3 2023             0    0.620     0    15    15        37.5       -22.5
+4 2024             0    0.616     0    15    15        37.5       -22.5
+# ℹ 4 more variables: actual_max &lt;dbl&gt;, actual_min &lt;dbl&gt;,
+#   has_high_outliers &lt;lgl&gt;, has_low_outliers &lt;lgl&gt;</code></pre>
+</div>
+</div>
+<p>The Q1 for all the years is actually ‘0’ indicating these are either remote workers, workers staying next door to work, and people without jobs. While mean stayed around 10 minutes, there outliers have increased gradually from 2021 to 2024 which suggests more people moving to places that are far from work locations during pandemic remote was the norm time and then they were called to work which significantly increased their travel time. In the investigation pct_zero column clearly shows gradual decrease from 64.5% to 61.5%</p>
 
 
 </section>
