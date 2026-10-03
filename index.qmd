@@ -720,6 +720,28 @@ categorical_vars <- categorical_vars[categorical_vars %in% colnames(x)]
 ```{r}
 summary(pums_tible_2024_2021_with_state)
 ```
+
+Now let's construct a label query so that I can display it on the boxplot 
+
+```{r}
+
+
+get_label_for_var <- function(var) {
+  
+  variables_metadata <- load_variables_rds_by_year("2024") #let's use default 2024
+  #I also checked ST and STATE variables between different years the labels are same 
+  var_label <- variables_metadata[[var]]$label
+  if (is.null(var_label)) {
+    var_label <- var_var   # "year" has no metadata entry -- fall back to the raw name
+  }
+
+  var_label
+}
+
+```
+
+
+
 ```{r}
 plot.census <- function(x, numeric_var, categorical_var) {
   if(missing(numeric_var) || missing(categorical_var)) {
@@ -750,11 +772,19 @@ plot.census <- function(x, numeric_var, categorical_var) {
   
   ggplot(x, aes(x = get(categorical_var), y = get(numeric_var), weight = PWGTP)) + 
     geom_boxplot() + 
-    labs(x = categorical_var, y = numeric_var)
-  
-  
-  
+    labs(x = paste0(categorical_var, "(", get_label_for_var(categorical_var), ")"),
+         y = paste0(numeric_var, "(", get_label_for_var(numeric_var), ")"),
+         title = paste(numeric_var, " by ", categorical_var),
+         subtitle = "Weighted by PWGTP (survey weight)",
+         caption = "Source: Census PUMS data")
   
 }
+
+```
+
+Now let's test the `plot` function
+
+```{r}
+plot(pums_tible_2024_2021_with_state,"JWMNP","SEX")
 
 ```
