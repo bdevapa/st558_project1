@@ -801,7 +801,7 @@ Another thing `summary` function provided is male to female ratio for the data w
 This observation matches with what I found on internet [Population Pyramids -North Carolina](https://www.populationpyramids.org/states/north-carolina)
 
 ## Investigation-2 GRPIP vs SEX 
-One thing that stands out immediately in GRPIP vs SEX plot is the lower fence of IQR actually starts at `0`
+One immediate things that stands out in GRPIP vs SEX plot is the lower fence of IQR actually starts at `0`
 
 This means there are people who do not pay rent at all and their share of NC population is more than 25 %. Per boxplot definition since at least 25% of the population pays no rent at all, the 25th percentile (Q1) of GRPIP is exactly 0. Because GRPIP can't go below 0, there is no room for a lower whisker to extend. It collapses to the same point as the box edge.
 
@@ -824,7 +824,7 @@ pums_combined_tibble |>
   )
 ```
 
-Now this confirms the presense of high outliers where the some population of NC is paying more rent than the income they receive. A generally recommended rule is rental expense cannot be more than 30-40% of income. Here clearly there is a segment where this is not holding true. Let's check summary to see if it offers any additional perspective.
+Now this confirms the presense of high outliers where the some poulation of NC is paying more rent than the income they receive. A general rule is rental expense cannot be more than 30-40% of income. Here clearly there is a population segement where that is not happening. Let's check summary to see if it offers any additional perspective.
 
 
 ```{r}
@@ -871,4 +871,5 @@ pums_combined_tibble |>
   )
 ```
 The Q1 for all the years is actually '0' indicating these are either remote workers, workers staying next door to work, and people without jobs. 
-While mean stayed around 10 minutes, the max value of outliers has increased gradually from 2021 to 2024. This suggests more workers moving to places that are far from work locations during the pandemic-remote-was-the-norm time. However they were called to work (RTI) which resulted in increased travel time. In the investigation pct_zero column clearly shows gradual decrease from 64.5% to 61.5%
+While mean stayed around 10 minutes, there outliers have increased gradually from 2021 to 2024 which suggests more people moving to places that are far from work locations during pandemic remote was the norm time and then they were called to work which significantly increased their travel time. In the investigation pct_zero column clearly shows gradual decrease from 64.5% to 61.5%
+
